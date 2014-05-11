@@ -1,6 +1,6 @@
-int RED = 3;
-int BLUE = 5;
-int GREEN = 6;
+int RED   = 0;
+int BLUE  = 1;
+int GREEN = 4;
 
 // the setup routine runs once when you press reset:
 void setup() {          
