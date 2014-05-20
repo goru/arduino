@@ -1,5 +1,11 @@
 #include <stdio.h>
+
+#if defined LINUX
 #include <libusb-1.0/libusb.h>
+#elif defined DARWIN
+#include <libusb.h>
+#endif
+
 #include <unistd.h>
 #include <signal.h>
 
