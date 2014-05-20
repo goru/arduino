@@ -9,10 +9,11 @@
 #include <unistd.h>
 #include <signal.h>
 
-int idVendor = 0x16c0;
-int idProduct = 0x05df;
+int ID_VENDOR  = 0x16c0;
+int ID_PRODUCT = 0x05df;
+int CMD_READ   = 0x0001;
 
-libusb_device_handle* findDigiSpark();
+libusb_device_handle* findDigispark();
 
 int interrupted = 0;
 void interruptHandler(int signal) {
@@ -20,44 +21,48 @@ void interruptHandler(int signal) {
 }
 
 int main (int argc, char **argv) {
+    int ret = 0;
     libusb_context* context = NULL;
 
-    int r = libusb_init(&context);
-    if (r < LIBUSB_SUCCESS) {
-        fprintf(stderr, "libusb_init failure: %d\n", r);
-        return 1;
+    ret = libusb_init(&context);
+    if (ret < LIBUSB_SUCCESS) {
+        fprintf(stderr, "libusb_init failure: %d\n", ret);
+        return ret;
     }
 
     //libusb_set_debug(context, LIBUSB_LOG_LEVEL_DEBUG);
 
-    libusb_device_handle* handle = findDigiSpark();
+    libusb_device_handle* handle = findDigispark();
     if (handle != NULL && signal(SIGINT, interruptHandler) != SIG_ERR) {
         printf("press Ctrl+C to exit\n");
 
         while (interrupted != 1) {
             unsigned char c;
-            int r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_DEVICE, 0x01, 0, 0, &c, 1, 1000);
-            if (r < LIBUSB_SUCCESS) {
-                fprintf(stderr, "libusb_control_transfer failure: %d\n", r);
+            ret = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_DEVICE, CMD_READ, 0, 0, &c, 1, 1000);
+            if (ret < LIBUSB_SUCCESS) {
+                fprintf(stderr, "libusb_control_transfer failure: %d\n", ret);
                 break;
             }
 
-            if (r > 0) {
+            if (ret == 1) {
                 printf("%c", c);
+                usleep(100000); // 0.1sec
+            } else {
+                sleep(2);
             }
-
-            usleep(100000); // 0.1sec
         }
-        
+
         libusb_close(handle);
     }
 
     libusb_exit(context);
 
     printf("exit\n");
+
+    return ret;
 }
 
-libusb_device_handle* findDigiSpark() {
+libusb_device_handle* findDigispark() {
     libusb_device** deviceList = NULL;
     int count = libusb_get_device_list(NULL, &deviceList);
     if (count < LIBUSB_SUCCESS) {
@@ -74,7 +79,7 @@ libusb_device_handle* findDigiSpark() {
             break;
         }
 
-        if (desc.idVendor == idVendor && desc.idProduct == idProduct) {
+        if (desc.idVendor == ID_VENDOR && desc.idProduct == ID_PRODUCT) {
             printf("Digispark found\n");
             handle = libusb_open_device_with_vid_pid(NULL, desc.idVendor, desc.idProduct);
             if (handle == NULL) {
@@ -85,7 +90,7 @@ libusb_device_handle* findDigiSpark() {
     }
 
     if (handle == NULL) {
-        fprintf(stderr, "could not find Digispark\n");
+        fprintf(stderr, "could not find/open Digispark\n");
     }
 
     libusb_free_device_list(deviceList, 1);
