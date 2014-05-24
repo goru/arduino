@@ -1,3 +1,5 @@
+/** vim: set et sw=2 sts=2 ts=2 ft=cpp : **/
+
 #include <TinySoftPwm.h>
 #include <DigiUSB.h>
 
@@ -17,7 +19,7 @@ void setup()
 
 void loop()
 {
-  static uint8_t rgb[3] = { 0, 0, 200 };
+  static uint8_t rgb[3] = { 0, 0, 128 };
 
   pwmProcess();
   pwmWrite(rgb);
@@ -28,17 +30,16 @@ void loop()
 void pwmProcess()
 {
   static uint32_t m = micros();
-  
+
   /***********************************************************/
   /* Call TinySoftPwm_process() with a period of 60 us       */
   /* The PWM frequency = 128 x 60 # 7.7 ms -> F # 130Hz      */
   /* 128 is the first argument passed to TinySoftPwm_begin() */
   /***********************************************************/
-  if((micros() - m) < 60)
-  {
+  if ((micros() - m) < 60) {
     return;
   }
-  
+
   /* We arrive here every 60 microseconds */
   m = micros();
 
@@ -50,15 +51,14 @@ void pwmWrite(uint8_t* rgb)
   static uint32_t m = millis();
   static uint8_t pwmStep = 0;
   static int8_t dir = 1;
-  
+
   /*************************************************************/
   /* Increment/decrement PWM on LED Pin with a period of 10 ms */
   /*************************************************************/
-  if((millis() - m) < 10)
-  {
+  if ((millis() - m) < 10) {
     return;
   }
-  
+
   /* We arrived here every 10 milliseconds */
   m = millis();
 
@@ -70,7 +70,7 @@ void pwmWrite(uint8_t* rgb)
     PIN_BLUE,  ((float)rgb[INDEX_BLUE]  / 255) * pwmStep);
 
   pwmStep += dir;
-  
+
   if (pwmStep == 255) {
     dir = -1;
   } else if (pwmStep == 0) {
@@ -83,14 +83,13 @@ void readFromUSB(uint8_t* rgb)
 {
   static uint8_t i = 0, j = 0;
   static char buf[] = "255";
-  
+
   DigiUSB.refresh();
-  
-  if(!DigiUSB.available())
-  {
+
+  if (!DigiUSB.available()) {
     return;
   }
-  
+
   char c = DigiUSB.read();
   switch (c) {
     case 'r':
@@ -103,7 +102,7 @@ void readFromUSB(uint8_t* rgb)
       i = INDEX_BLUE;  j = 0;
       break;
   }
-  
+
   if ((j < 3) && ('0' <= c) && (c <= '9')) {
     buf[j++] = c;
     if (j == 3) {
