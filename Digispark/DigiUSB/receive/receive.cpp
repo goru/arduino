@@ -2,7 +2,7 @@
 
 #if defined LINUX
 #include <libusb-1.0/libusb.h>
-#elif defined DARWIN
+#elif defined DARWIN || defined CYGWIN
 #include <libusb.h>
 #endif
 
