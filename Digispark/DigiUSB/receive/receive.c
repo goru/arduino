@@ -73,7 +73,9 @@ libusb_device_handle* findDigispark() {
     }
 
     libusb_device_handle* handle = NULL;
-    for (int i = 0; i < count; i++) {
+
+    int i;
+    for (i = 0; i < count; i++) {
         struct libusb_device_descriptor desc;
         int r = libusb_get_device_descriptor(deviceList[i], &desc);
         if (r < LIBUSB_SUCCESS) {
