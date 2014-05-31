@@ -22,15 +22,17 @@ void interruptHandler(int signal) {
 
 int main (int argc, char **argv) {
     int ret = 0;
-    libusb_context* context = NULL;
 
+    libusb_context* context = NULL;
     ret = libusb_init(&context);
     if (ret < LIBUSB_SUCCESS) {
         fprintf(stderr, "libusb_init failure: %d\n", ret);
         return ret;
     }
 
-    //libusb_set_debug(context, LIBUSB_LOG_LEVEL_DEBUG);
+#ifdef DEBUG
+    libusb_set_debug(context, LIBUSB_LOG_LEVEL_DEBUG);
+#endif
 
     libusb_device_handle* handle = findDigispark();
     if (handle != NULL && signal(SIGINT, interruptHandler) != SIG_ERR) {
