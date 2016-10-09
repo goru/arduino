@@ -321,12 +321,34 @@ void* handle_http_request(struct scheduled_handler* self) {
   if(self->result == NULL) {
     self->interval = 0; // for handleClient()
 
-    http_server.on("/inline", [](){
-        http_server.send(200, "text/plain", "this works as well\n");
+    http_server.onNotFound([](){
+      http_server.send(404, "text/plain", "not found\n");
     });
 
-    http_server.onNotFound([](){
-        http_server.send(404, "text/plain", "not found\n");
+    http_server.on("/api/led/on", [](){
+      find_scheduled_handler("adc_red")->enable = true;
+      find_scheduled_handler("adc_green")->enable = true;
+      find_scheduled_handler("adc_blue")->enable = true;
+      http_server.send(204, "", "\n");
+    });
+
+    http_server.on("/api/led/off", [](){
+      find_scheduled_handler("adc_red")->enable = false;
+      find_scheduled_handler("adc_green")->enable = false;
+      find_scheduled_handler("adc_blue")->enable = false;
+      *(unsigned int*)find_scheduled_handler("adc_red")->result = 0;
+      *(unsigned int*)find_scheduled_handler("adc_green")->result = 0;
+      *(unsigned int*)find_scheduled_handler("adc_blue")->result = 0;
+      http_server.send(204, "", "\n");
+    });
+
+    http_server.on("/api/led/status", [](){
+      char buf[38];
+      sprintf(buf, "{\"red\":%d,\"green\":%d,\"blue\":%d}\n", 
+        *(unsigned int*)find_scheduled_handler("adc_red")->result,
+        *(unsigned int*)find_scheduled_handler("adc_green")->result,
+        *(unsigned int*)find_scheduled_handler("adc_blue")->result);
+      http_server.send(200, "application/json", buf);
     });
 
     http_server.begin();
@@ -368,4 +390,3 @@ void* print_values(struct scheduled_handler* self) {
   Serial.println();
   return NULL;
 }
-
