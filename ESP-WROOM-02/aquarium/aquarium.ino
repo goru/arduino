@@ -7,33 +7,36 @@ extern "C" {
   #include "sntp.h"
 }
 
-#define ESP_ADC_CC      15
-#define ESP_PWM_RED     5
-#define ESP_PWM_GREEN   4
-#define ESP_PWM_BLUE    16
-#define ESP_ONEWIRE     2
+//#define DEBUG_ADC_REG
+//#define DEBUG_ADC_LIGHT
 
-#define ADC_VREF        3.3
-#define ADC_RESOLUTION  1024
+#define ESP_ADC_CC         15
+#define ESP_PWM_RED        5
+#define ESP_PWM_GREEN      4
+#define ESP_PWM_BLUE       16
+#define ESP_ONEWIRE        2
 
-#define ADC_RED         0
-#define ADC_GREEN       1
-#define ADC_BLUE        2
+#define ADC_VREF           3.3
+#define ADC_RESOLUTION     1024
 
-#define ADC_LIGHT_IN    3
-#define ADC_LIGHT_OUT   4
-#define ADC_LIGHT_REG   10000            // Registor 10k
-#define ADC_LIGHT_PC    (0.000033 / 100) // Photocurrent 33uA:100lux
+#define ADC_RED            0
+#define ADC_GREEN          1
+#define ADC_BLUE           2
+
+#define ADC_LIGHT_IN       3
+#define ADC_LIGHT_OUT      4
+#define ADC_LIGHT_REG      10000            // Registor 10k
+#define ADC_LIGHT_PC       (0.000033 / 100) // Photocurrent 33uA:100lux
 
 #include "private.h"
 #ifndef ESP_WIFI_SSID
-#define ESP_WIFI_SSID   "your access point name"
+#define ESP_WIFI_SSID      "your access point name"
 #endif
 #ifndef ESP_WIFI_PASSWD
-#define ESP_WIFI_PASSWD "password for access point"
+#define ESP_WIFI_PASSWD    "password for access point"
 #endif
 #ifndef ESP_NTP_SERVER
-#define ESP_NTP_SERVER  "ntp.nict.jp"
+#define ESP_NTP_SERVER     "ntp.nict.jp"
 #endif
 
 ESP8266WebServer http_server(80);
@@ -142,9 +145,11 @@ void* read_adc_red(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
   result = readAdc(ADC_RED); // 0-1023
-//  Serial.print("adc_red=");
-//  Serial.print(result);
-//  Serial.println();
+#ifdef DEBUG_ADC_REG
+  Serial.print("adc_red=");
+  Serial.print(result);
+  Serial.println();
+#endif
 
   return &result;
 }
@@ -153,9 +158,11 @@ void* read_adc_green(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
   result = readAdc(ADC_GREEN); // 0-1023
-//  Serial.print("adc_green=");
-//  Serial.print(result);
-//  Serial.println();
+#ifdef DEBUG_ADC_REG
+  Serial.print("adc_green=");
+  Serial.print(result);
+  Serial.println();
+#endif
 
   return &result;
 }
@@ -164,9 +171,11 @@ void* read_adc_blue(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
   result = readAdc(ADC_BLUE); // 0-1023
-//  Serial.print("adc_blue=");
-//  Serial.print(result);
-//  Serial.println();
+#ifdef DEBUG_ADC_REG
+  Serial.print("adc_blue=");
+  Serial.print(result);
+  Serial.println();
+#endif
 
   return &result;
 }
@@ -202,9 +211,11 @@ void* read_adc_light_in(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
   result = calculate_lux(readAdc(ADC_LIGHT_IN)); // adc:0-1024, lux:0-1000
-//  Serial.print("adc_light_in=");
-//  Serial.print(result);
-//  Serial.println();
+#ifdef DEBUG_ADC_LIGHT
+  Serial.print("adc_light_in=");
+  Serial.print(result);
+  Serial.println();
+#endif
 
   return &result;
 }
@@ -213,9 +224,11 @@ void* read_adc_light_out(struct scheduled_handler* self) {
   static unsigned int result = 0;
 
   result = calculate_lux(readAdc(ADC_LIGHT_OUT)); // adc:0-1024, lux:0-1000
-//  Serial.print("adc_light_out=");
-//  Serial.print(result);
-//  Serial.println();
+#ifdef DEBUG_ADC_LIGHT
+  Serial.print("adc_light_out=");
+  Serial.print(result);
+  Serial.println();
+#endif
 
   return &result;
 }
