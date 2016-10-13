@@ -13,11 +13,17 @@ extern "C" {
 #define ESP_PWM_BLUE    16
 #define ESP_ONEWIRE     2
 
+#define ADC_VREF        3.3
+#define ADC_RESOLUTION  1024
+
 #define ADC_RED         0
 #define ADC_GREEN       1
 #define ADC_BLUE        2
+
 #define ADC_LIGHT_IN    3
 #define ADC_LIGHT_OUT   4
+#define ADC_LIGHT_REG   10000            // Registor 10k
+#define ADC_LIGHT_PC    (0.000033 / 100) // Photocurrent 33uA:100lux
 
 #include "private.h"
 #ifndef ESP_WIFI_SSID
@@ -186,10 +192,16 @@ void* set_led_brightness(struct scheduled_handler* self) {
   return &result;
 }
 
+unsigned int calculate_lux(unsigned int adc_result) {
+  double lux_per_voltage = ADC_LIGHT_REG * ADC_LIGHT_PC;
+  double voltage = ADC_VREF / ADC_RESOLUTION * adc_result;
+  return floor(voltage / lux_per_voltage);
+}
+
 void* read_adc_light_in(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
-  result = readAdc(ADC_LIGHT_IN); // 0-1023
+  result = calculate_lux(readAdc(ADC_LIGHT_IN)); // adc:0-1024, lux:0-1000
 //  Serial.print("adc_light_in=");
 //  Serial.print(result);
 //  Serial.println();
@@ -200,7 +212,7 @@ void* read_adc_light_in(struct scheduled_handler* self) {
 void* read_adc_light_out(struct scheduled_handler* self) {
   static unsigned int result = 0;
 
-  result = readAdc(ADC_LIGHT_OUT); // 0-1023
+  result = calculate_lux(readAdc(ADC_LIGHT_OUT)); // adc:0-1024, lux:0-1000
 //  Serial.print("adc_light_out=");
 //  Serial.print(result);
 //  Serial.println();
