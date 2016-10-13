@@ -9,6 +9,7 @@ extern "C" {
 
 //#define DEBUG_ADC_REG
 //#define DEBUG_ADC_LIGHT
+//#define DEBUG_ONEWIRE_TEMP
 
 #define ESP_ADC_CC         15
 #define ESP_PWM_RED        5
@@ -27,6 +28,9 @@ extern "C" {
 #define ADC_LIGHT_OUT      4
 #define ADC_LIGHT_REG      10000            // Registor 10k
 #define ADC_LIGHT_PC       (0.000033 / 100) // Photocurrent 33uA:100lux
+
+#define ONEWIRE_TEMP_AIR   { 0x28, 0xEE, 0x75, 0x4F, 0x16, 0x16, 0x01, 0x62 }
+#define ONEWIRE_TEMP_WATER { 0x28, 0x45, 0x8E, 0x26, 0x00, 0x00, 0x80, 0x1C }
 
 #include "private.h"
 #ifndef ESP_WIFI_SSID
@@ -75,8 +79,8 @@ struct scheduled_handler scheduled_handlers[] = {
   {true, 0,  100, "led_brightness",   set_led_brightness,  NULL},
   {true, 0,  500, "adc_light_in",     read_adc_light_in,   NULL},
   {true, 0,  500, "adc_light_out",    read_adc_light_out,  NULL},
-//  {true, 0,  100, "temp_air",         read_temp_air,       NULL},
-//  {true, 0,  100, "temp_water",       read_temp_water,     NULL},
+  {true, 0, 1000, "temp_air",         read_temp_air,       NULL},
+  {true, 0, 1000, "temp_water",       read_temp_water,     NULL},
   {true, 0, 1000, "wifi_connection",  get_wifi_connection, NULL},
   {true, 0, 1000, "http_request",     handle_http_request, NULL},
   {true, 0,  500, "ntp_server",       sync_ntp_server,     NULL},
@@ -233,71 +237,114 @@ void* read_adc_light_out(struct scheduled_handler* self) {
   return &result;
 }
 
+float read_temp(byte* target_addr) {
+  byte addr[8];
+  byte data[9];
+
+  // search devices
+  if(!onewire.search(addr)) {
+    onewire.reset_search();
+    return 0;
+  }
+
+  // if found device is not target device, do nothing
+  for(int i = 0; i < 8; i++) {
+    if(addr[i] != target_addr[i]) {
+      return 0;
+    }
+  }
+
+#ifdef DEBUG_ONEWIRE_TEMP
+  Serial.print("OneWire device found: ");
+  for(int i = 0; i < 8; i++) {
+    Serial.printf("0x%02X ", addr[i]);
+  }
+  Serial.println();
+#endif
+
+  if(OneWire::crc8(addr, 7) != addr[7]) {
+    Serial.println("CRC is not valid!");
+    return 0;
+  }
+
+  if(addr[0] != 0x28) {
+    Serial.printf("Device family is not DS18B20(0x28): 0x%02X", addr[0]);
+    return 0;
+  }
+
+  onewire.reset();
+  onewire.select(addr);
+  //onewire.write(0x44,1);         // start conversion, with parasite power on at the end
+  onewire.write(0x44);
+
+  delay(1000);     // maybe 750ms is enough, maybe not
+  // we might do a ds.depower() here, but the reset will take care of it.
+
+  byte present = onewire.reset();
+  if(present != 1) {
+    Serial.printf("Device is not ready: %d\n", present);
+    return 0;
+  }
+
+  onewire.select(addr);
+  onewire.write(0xBE);         // Read Scratchpad
+
+  for (int i = 0; i < 9; i++) {           // we need 9 bytes
+    data[i] = onewire.read();
+  }
+
+#ifdef DEBUG_ONEWIRE_TEMP
+  Serial.print("Returned data is: ");
+  for (int i = 0; i < 9; i++) {
+    Serial.printf("0x%02X ", data[i]);
+  }
+  Serial.println();
+#endif
+
+  if(OneWire::crc8(data, 8) != data[8]) {
+    Serial.println("CRC is not valid!");
+    return 0;
+  }
+
+  int16_t raw = (data[1] << 8) | data[0];
+  byte cfg = (data[4] & 0x60);
+  // at lower res, the low bits are undefined, so let's zero them
+  if(cfg == 0x00) {        // 9 bit resolution, 93.75 ms
+    raw = raw & ~7;
+  } else if(cfg == 0x20) { // 10 bit res, 187.5 ms
+    raw = raw & ~3;
+  } else if(cfg == 0x40) { // 11 bit res, 375 ms
+    raw = raw & ~1;
+  } else {                 // default is 12 bit resolution, 750 ms conversion time
+  }
+
+  float celsius = (float)raw / 16.0;
+#ifdef DEBUG_ONEWIRE_TEMP
+  Serial.print("Temperature: ");
+  Serial.print(celsius);
+  Serial.print(" C");
+  Serial.println();
+#endif
+
+  return celsius;
+}
+
+
 void* read_temp_air(struct scheduled_handler* self) {
-  static unsigned int result = 0;
-//  byte i;
-//  byte present = 0;
-//  byte data[12];
-//  byte addr[8];
-//
-//  onewire.reset_search();
-//  if(!onewire.search(addr)) {
-//    Serial.print("No more addresses.\n");
-//    onewire.reset_search();
-//    return;
-//  }
-//
-//  Serial.print("R=");
-//  for( i = 0; i < 8; i++) {
-//    Serial.print(addr[i], HEX);
-//    Serial.print(" ");
-//  }
-//
-//  if ( OneWire::crc8( addr, 7) != addr[7]) {
-//      Serial.print("CRC is not valid!\n");
-//      return;
-//  }
-//
-//  if ( addr[0] == 0x10) {
-//      Serial.print("Device is a DS18S20 family device.\n");
-//  }
-//  else if ( addr[0] == 0x28) {
-//      Serial.print("Device is a DS18B20 family device.\n");
-//  }
-//  else {
-//      Serial.print("Device family is not recognized: 0x");
-//      Serial.println(addr[0],HEX);
-//      return;
-//  }
-//
-//  onewire.reset();
-//  onewire.select(addr);
-//  onewire.write(0x44,1);         // start conversion, with parasite power on at the end
-//
-//  delay(1000);     // maybe 750ms is enough, maybe not
-//  // we might do a ds.depower() here, but the reset will take care of it.
-//
-//  present = onewire.reset();
-//  onewire.select(addr);    
-//  onewire.write(0xBE);         // Read Scratchpad
-//
-//  Serial.print("P=");
-//  Serial.print(present,HEX);
-//  Serial.print(" ");
-//  for ( i = 0; i < 9; i++) {           // we need 9 bytes
-//    data[i] = onewire.read();
-//    Serial.print(data[i], HEX);
-//    Serial.print(" ");
-//  }
-//  Serial.print(" CRC=");
-//  Serial.print( OneWire::crc8( data, 8), HEX);
-//  Serial.println();
+  static float result = 0;
+  byte target[8] = ONEWIRE_TEMP_AIR;
+
+  result = read_temp(target);
 
   return &result;
 }
 
 void* read_temp_water(struct scheduled_handler* self) {
-  static unsigned int result = 0;
+  static float result = 0;
+  byte target[8] = ONEWIRE_TEMP_WATER;
+
+  result = read_temp(target);
+
   return &result;
 }
 
@@ -415,6 +462,6 @@ void* print_values(struct scheduled_handler* self) {
   Serial.printf("light_out=%4d", *(unsigned int*)(find_scheduled_handler("adc_light_out")->result));
 //  Serial.printf("temp_air=%4d, ", *(unsigned int*)(find_scheduled_handler("temp_air")->result));
 //  Serial.printf("temp_water=%4d\n", *(unsigned int*)(find_scheduled_handler("temp_water")->result));
-  Serial.println();
+    Serial.println();
   return NULL;
 }
