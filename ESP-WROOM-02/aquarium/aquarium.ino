@@ -77,11 +77,11 @@ struct scheduled_handler scheduled_handlers[] = {
   {true, 0,  100, "adc_green",        read_adc_green,      NULL},
   {true, 0,  100, "adc_blue",         read_adc_blue,       NULL},
   {true, 0,  100, "led_brightness",   set_led_brightness,  NULL},
-  {true, 0,  500, "adc_light_in",     read_adc_light_in,   NULL},
-  {true, 0,  500, "adc_light_out",    read_adc_light_out,  NULL},
+  {true, 0, 1000, "adc_light_in",     read_adc_light_in,   NULL},
+  {true, 0, 1000, "adc_light_out",    read_adc_light_out,  NULL},
   {true, 0, 1000, "temp_air",         read_temp_air,       NULL},
   {true, 0, 1000, "temp_water",       read_temp_water,     NULL},
-  {true, 0, 1000, "wifi_connection",  get_wifi_connection, NULL},
+  {true, 0,    0, "wifi_connection",  get_wifi_connection, NULL},
   {true, 0, 1000, "http_request",     handle_http_request, NULL},
   {true, 0,  500, "ntp_server",       sync_ntp_server,     NULL},
   {true, 0, 3000, "print_values",     print_values,        NULL},
@@ -148,7 +148,7 @@ unsigned int readAdc(byte ch) {
 void* read_adc_red(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
-  result = readAdc(ADC_RED); // 0-1023
+  result = readAdc(ADC_RED); // 0 - 1023
 #ifdef DEBUG_ADC_REG
   Serial.print("adc_red=");
   Serial.print(result);
@@ -161,7 +161,7 @@ void* read_adc_red(struct scheduled_handler* self) {
 void* read_adc_green(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
-  result = readAdc(ADC_GREEN); // 0-1023
+  result = readAdc(ADC_GREEN); // 0 - 1023
 #ifdef DEBUG_ADC_REG
   Serial.print("adc_green=");
   Serial.print(result);
@@ -174,7 +174,7 @@ void* read_adc_green(struct scheduled_handler* self) {
 void* read_adc_blue(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
-  result = readAdc(ADC_BLUE); // 0-1023
+  result = readAdc(ADC_BLUE); // 0 - 1023
 #ifdef DEBUG_ADC_REG
   Serial.print("adc_blue=");
   Serial.print(result);
@@ -214,7 +214,7 @@ unsigned int calculate_lux(unsigned int adc_result) {
 void* read_adc_light_in(struct scheduled_handler* self) {
   static unsigned int result = 0;
   
-  result = calculate_lux(readAdc(ADC_LIGHT_IN)); // adc:0-1024, lux:0-1000
+  result = calculate_lux(readAdc(ADC_LIGHT_IN)); // adc:0 - 1024, lux:0 - 1000
 #ifdef DEBUG_ADC_LIGHT
   Serial.print("adc_light_in=");
   Serial.print(result);
@@ -227,7 +227,7 @@ void* read_adc_light_in(struct scheduled_handler* self) {
 void* read_adc_light_out(struct scheduled_handler* self) {
   static unsigned int result = 0;
 
-  result = calculate_lux(readAdc(ADC_LIGHT_OUT)); // adc:0-1024, lux:0-1000
+  result = calculate_lux(readAdc(ADC_LIGHT_OUT)); // adc:0 - 1024, lux:0 - 1000
 #ifdef DEBUG_ADC_LIGHT
   Serial.print("adc_light_out=");
   Serial.print(result);
@@ -238,20 +238,24 @@ void* read_adc_light_out(struct scheduled_handler* self) {
 }
 
 float read_temp(byte* target_addr) {
+  // -60 is failed, -55 to 125 is valid temperature.
+  float result = -60;
+  bool found = false;
   byte addr[8];
   byte data[9];
 
   // search devices
-  if(!onewire.search(addr)) {
-    onewire.reset_search();
-    return 0;
+  onewire.reset_search();
+  while(onewire.search(addr)) {
+    if(memcmp(addr, target_addr, 8) == 0) {
+      found = true;
+      break;
+    }
   }
 
-  // if found device is not target device, do nothing
-  for(int i = 0; i < 8; i++) {
-    if(addr[i] != target_addr[i]) {
-      return 0;
-    }
+  if(found == false) {
+    Serial.println("Couldn't find specified device.");
+    return result;
   }
 
 #ifdef DEBUG_ONEWIRE_TEMP
@@ -264,12 +268,12 @@ float read_temp(byte* target_addr) {
 
   if(OneWire::crc8(addr, 7) != addr[7]) {
     Serial.println("CRC is not valid!");
-    return 0;
+    return result;
   }
 
   if(addr[0] != 0x28) {
     Serial.printf("Device family is not DS18B20(0x28): 0x%02X", addr[0]);
-    return 0;
+    return result;
   }
 
   onewire.reset();
@@ -283,7 +287,7 @@ float read_temp(byte* target_addr) {
   byte present = onewire.reset();
   if(present != 1) {
     Serial.printf("Device is not ready: %d\n", present);
-    return 0;
+    return result;
   }
 
   onewire.select(addr);
@@ -303,7 +307,7 @@ float read_temp(byte* target_addr) {
 
   if(OneWire::crc8(data, 8) != data[8]) {
     Serial.println("CRC is not valid!");
-    return 0;
+    return result;
   }
 
   int16_t raw = (data[1] << 8) | data[0];
@@ -318,15 +322,15 @@ float read_temp(byte* target_addr) {
   } else {                 // default is 12 bit resolution, 750 ms conversion time
   }
 
-  float celsius = (float)raw / 16.0;
+  result = (float)raw / 16.0;
 #ifdef DEBUG_ONEWIRE_TEMP
   Serial.print("Temperature: ");
-  Serial.print(celsius);
+  Serial.print(result);
   Serial.print(" C");
   Serial.println();
 #endif
 
-  return celsius;
+  return result;
 }
 
 
@@ -334,7 +338,7 @@ void* read_temp_air(struct scheduled_handler* self) {
   static float result = 0;
   byte target[8] = ONEWIRE_TEMP_AIR;
 
-  result = read_temp(target);
+  result = read_temp(target); // -55C - 125C
 
   return &result;
 }
@@ -343,7 +347,7 @@ void* read_temp_water(struct scheduled_handler* self) {
   static float result = 0;
   byte target[8] = ONEWIRE_TEMP_WATER;
 
-  result = read_temp(target);
+  result = read_temp(target); // -55C - 125C
 
   return &result;
 }
@@ -449,19 +453,47 @@ void* sync_ntp_server(struct scheduled_handler* self) {
   }
 
   result = sntp_get_current_timestamp();
+  if(result == 0) {
+    return NULL;
+  }
 
   return &result;
 }
 
 void* print_values(struct scheduled_handler* self) {
-  Serial.printf("time=%10d, ", *(uint32*)(find_scheduled_handler("ntp_server")->result));
-  Serial.printf("red=%4d, ", *(unsigned int*)(find_scheduled_handler("adc_red")->result));
-  Serial.printf("green=%4d, ", *(unsigned int*)(find_scheduled_handler("adc_green")->result));
-  Serial.printf("blue=%4d, ", *(unsigned int*)(find_scheduled_handler("adc_blue")->result));
-  Serial.printf("light_in=%4d, ", *(unsigned int*)(find_scheduled_handler("adc_light_in")->result));
-  Serial.printf("light_out=%4d", *(unsigned int*)(find_scheduled_handler("adc_light_out")->result));
-//  Serial.printf("temp_air=%4d, ", *(unsigned int*)(find_scheduled_handler("temp_air")->result));
-//  Serial.printf("temp_water=%4d\n", *(unsigned int*)(find_scheduled_handler("temp_water")->result));
+  uint32* time = (uint32*)(find_scheduled_handler("ntp_server")->result);
+  if(time != NULL) {
+    Serial.printf("time=%10d\n", *time);
+  }
+
+  unsigned int* red = (unsigned int*)(find_scheduled_handler("adc_red")->result);
+  unsigned int* green = (unsigned int*)(find_scheduled_handler("adc_green")->result);
+  unsigned int* blue = (unsigned int*)(find_scheduled_handler("adc_blue")->result);
+  if(red != NULL && green != NULL && blue != NULL) {
+    Serial.printf("red=%4d, ", *red);
+    Serial.printf("green=%4d, ", *green);
+    Serial.printf("blue=%4d\n", *blue);
+  }
+
+  unsigned int* in = (unsigned int*)(find_scheduled_handler("adc_light_in")->result);
+  unsigned int* out = (unsigned int*)(find_scheduled_handler("adc_light_out")->result);
+  if(in != NULL && out != NULL) {
+    Serial.printf("light_in=%4d, ", *in);
+    Serial.printf("light_out=%4d\n", *out);
+  }
+
+  float* air = (float*)(find_scheduled_handler("temp_air")->result);
+  float* water = (float*)(find_scheduled_handler("temp_water")->result);
+  if(air != NULL && water != NULL) {
+    Serial.print("temp_air=");
+    Serial.print(*(float*)(find_scheduled_handler("temp_air")->result));
+    Serial.print(", ");
+    Serial.print("temp_water=");
+    Serial.print(*(float*)(find_scheduled_handler("temp_water")->result));
     Serial.println();
+  }
+
+  Serial.println();
+
   return NULL;
 }
