@@ -8,16 +8,16 @@ extern "C" {
 }
 
 #define ESP_ADC_CC      15
-#define ESP_PWM_RED      5
-#define ESP_PWM_GREEN    4
+#define ESP_PWM_RED     5
+#define ESP_PWM_GREEN   4
 #define ESP_PWM_BLUE    16
-#define ESP_ONEWIRE      2
+#define ESP_ONEWIRE     2
 
-#define ADC_RED          0
-#define ADC_GREEN        1
-#define ADC_BLUE         2
-#define ADC_LIGHT_IN     3
-#define ADC_LIGHT_OUT    4
+#define ADC_RED         0
+#define ADC_GREEN       1
+#define ADC_BLUE        2
+#define ADC_LIGHT_IN    3
+#define ADC_LIGHT_OUT   4
 
 #include "private.h"
 #ifndef ESP_WIFI_SSID
@@ -110,6 +110,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
 
+  SPI.begin();
+
   pinMode(ESP_ADC_CC, OUTPUT);
 
   initialize_scheduled_handlers();
@@ -121,13 +123,11 @@ void loop() {
 }
 
 unsigned int readAdc(byte ch) {
-  SPI.begin();
   digitalWrite(ESP_ADC_CC, LOW);
-  SPI.transfer(0x01); // startbit
+  SPI.transfer(0x01);
   byte highbyte = SPI.transfer(((8+ch)<<4));
   byte lowbyte = SPI.transfer(0x00);
   digitalWrite(ESP_ADC_CC, HIGH);
-  SPI.end();
   
   return ((highbyte << 8) + lowbyte) & 0x03FF;
 }
@@ -326,6 +326,7 @@ void* handle_http_request(struct scheduled_handler* self) {
     });
 
     http_server.on("/api/led/on", [](){
+      Serial.println("/api/led/on");
       find_scheduled_handler("adc_red")->enable = true;
       find_scheduled_handler("adc_green")->enable = true;
       find_scheduled_handler("adc_blue")->enable = true;
@@ -333,6 +334,7 @@ void* handle_http_request(struct scheduled_handler* self) {
     });
 
     http_server.on("/api/led/off", [](){
+      Serial.println("/api/led/off");
       find_scheduled_handler("adc_red")->enable = false;
       find_scheduled_handler("adc_green")->enable = false;
       find_scheduled_handler("adc_blue")->enable = false;
@@ -343,6 +345,7 @@ void* handle_http_request(struct scheduled_handler* self) {
     });
 
     http_server.on("/api/led/status", [](){
+      Serial.println("/api/led/status");
       char buf[38];
       sprintf(buf, "{\"red\":%d,\"green\":%d,\"blue\":%d}\n", 
         *(unsigned int*)find_scheduled_handler("adc_red")->result,
