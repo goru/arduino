@@ -364,16 +364,31 @@ void* get_wifi_connection(struct scheduled_handler* self) {
     Serial.println("WiFi status is disconnected. Need to reconnect.");
   }
 
-  Serial.printf("Connecting to %s.", ESP_WIFI_SSID);
-  
-  WiFi.begin(ESP_WIFI_SSID, ESP_WIFI_PASSWD);
- 
-  // waiting 10 seconds
-  for(int i = 0; (i < 20) && (WiFi.status() != WL_CONNECTED); i++) {
-    delay(500);
-    Serial.print(".");
+  Serial.println("Searching access point...");
+
+  int8_t count = WiFi.scanNetworks();
+  int8_t found = -1;
+  for(int i = 0; i < count; i++) {
+    if(WiFi.SSID(i).equals(ESP_WIFI_SSID)) {
+      found = i;
+      break;
+    }
   }
-  Serial.println();
+
+  if(found == -1) {
+    Serial.printf("Couldn't find %s.\n", ESP_WIFI_SSID);
+  } else {
+    Serial.printf("Connecting to %s, %ddBm, %dch.", ESP_WIFI_SSID, WiFi.RSSI(found), WiFi.channel(found));
+    
+    WiFi.begin(ESP_WIFI_SSID, ESP_WIFI_PASSWD);
+ 
+    // waiting 10 seconds
+    for(int i = 0; (i < 20) && (WiFi.status() != WL_CONNECTED); i++) {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println();
+  }
 
   if(WiFi.status() == WL_CONNECTED) {
     result = 0;
